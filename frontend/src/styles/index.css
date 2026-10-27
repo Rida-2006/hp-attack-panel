@@ -365,3 +365,5 @@ ul { padding-left: 18px; color: #aaaabb; font-size: 11px; line-height: 2; }
 .demo-banner strong { font-size:10px; letter-spacing:1px; }
 .badge.demo { color:#f6b486; border-color:#a45d32; background:#f9731612; }
 @media print { .demo-banner { display:block !important; border-color:#333; color:#111; background:white; }.demo-banner span { display:block; } }
+.reports>*,.connection-grid>* { min-width:0; }
+.table-wrap { position:relative; }

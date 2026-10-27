@@ -96,3 +96,15 @@ npm run build
 ```
 
 Backend integration tests use a temporary SQLite database and mocked HTTP target; they never send probes to an external target. Tests cover command rejection, execution, correlation, failed requests, persistence, replay, rate limiting, origin/host/client checks, WebSocket streaming, CSV, and retention.
+
+## Public demonstration build
+
+To build a static, browser-only demo without the FastAPI backend:
+
+```powershell
+cd frontend
+$env:VITE_DEMO_MODE = 'true'
+npm run build
+```
+
+This mode prominently labels all results as simulated. It sends no API, WebSocket, or honeypot requests. Simulated history stays in the visitor's browser storage. CSV reports include a `simulated` column. Remove the environment variable (`Remove-Item Env:VITE_DEMO_MODE`) before rebuilding the normal full-stack version.
