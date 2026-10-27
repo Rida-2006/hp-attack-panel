@@ -1,47 +1,8 @@
 [
-  {
-    "id": "p-001",
-    "name": "Basic GET root",
-    "method": "GET",
-    "path": "/",
-    "headers": {
-      "User-Agent": "hp-attack-panel/1.0",
-      "Accept": "*/*"
-    },
-    "body": "",
-    "tags": ["recon", "get"]
-  },
-  {
-    "id": "p-002",
-    "name": "Suspicious login probe",
-    "method": "POST",
-    "path": "/login",
-    "headers": {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    "body": "username=admin&******",
-    "tags": ["auth", "bruteforce"]
-  },
-  {
-    "id": "p-003",
-    "name": "Path traversal attempt",
-    "method": "GET",
-    "path": "/../../etc/passwd",
-    "headers": {
-      "User-Agent": "curl/8.0"
-    },
-    "body": "",
-    "tags": ["traversal", "lfi"]
-  },
-  {
-    "id": "p-004",
-    "name": "JSON API poke",
-    "method": "POST",
-    "path": "/api/v1/search",
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "body": "{\"query\":\"' OR 1=1 --\"}",
-    "tags": ["sqli", "api"]
-  }
+  {"id":"p-001","name":"HTTP reconnaissance","method":"GET","path":"/","headers":{"User-Agent":"Honeyguard-Lab/2.0"},"body":"","tags":["recon","get"]},
+  {"id":"p-002","name":"Authentication probe","method":"POST","path":"/login","headers":{"Content-Type":"application/x-www-form-urlencoded"},"body":"username=lab-test&password=lab-test","tags":["auth"]},
+  {"id":"p-003","name":"Path traversal probe","method":"GET","path":"/files?path=..%2F..%2Fetc%2Fpasswd","headers":{},"body":"","tags":["traversal"]},
+  {"id":"p-004","name":"SQL injection probe","method":"POST","path":"/api/v1/search","headers":{"Content-Type":"application/json"},"body":{"query":"' OR 1=1 --"},"tags":["sqli"]},
+  {"id":"p-005","name":"Template expression probe","method":"GET","path":"/?name=%7B%7B7*7%7D%7D","headers":{},"body":"","tags":["ssti"]},
+  {"id":"p-006","name":"Reflected input marker","method":"GET","path":"/?q=HONEYGUARD_REFLECTION_TEST","headers":{},"body":"","tags":["xss"]}
 ]
