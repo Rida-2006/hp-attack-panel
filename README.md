@@ -32,9 +32,9 @@ The existing six payloads in `payloads.json` are preserved: reconnaissance, auth
 
 ## Execution console
 
-Random Attack chooses an approved payload. Custom Shell accepts `help`, `status`, `list attacks`, `test <category or payload ID>`, `logs`, `history`, and `clear`. `history` is an operational execution log, not a threat-intelligence dashboard. All test commands use the same backend execution service.
+Random Attack sends a harmless form POST containing `content=Honeyguard harmless POST test` to the server-configured `TEST_TARGET_URL`. It does not select an exploit payload. Custom Shell retains the existing approved payload library. Custom Shell accepts `help`, `status`, `list attacks`, `test <category or payload ID>`, `logs`, `history`, and `clear`. `history` is an operational execution log, not a threat-intelligence dashboard. All test commands use the same backend execution service.
 
-The live terminal streams attack, request, response, and error events over `/ws`. HTTP status and timing describe what the panel observed; they never establish honeypot detection or successful exploitation. Clear view affects only the browser terminal. Operational SQLite records remain bounded to seven days / 1,000 executions / 5,000 events, and the payload library remains server-managed.
+The live terminal streams initiated, target, request, response-status, full response-body, error, and completion events over `/ws`. The full decoded response body is rendered as text, never as executable HTML. A 2xx response is a successful HTTP test; non-2xx responses retain their actual body and report an HTTP error outcome. Connection failures and timeouts are recorded without inventing a response status. HTTP status and timing describe what the panel observed; they never establish honeypot detection or successful exploitation. Clear view affects only the browser terminal. Operational SQLite records remain bounded to seven days / 1,000 executions / 5,000 events, and the payload library remains server-managed.
 
 ## API boundary
 
@@ -75,3 +75,37 @@ Tests mock HTTP requests and use temporary databases. Authorized loopback fixtur
 ## Visual language
 
 Midnight Black `#0A0A0E`, Dark Charcoal `#1B1820`, Metallic Gold `#D8A84B`, Light Gold `#F6D68A`, Neon Red `#FF174F`, and Terminal Green `#39FF88`. The metallic lightning illustration is inline SVG, with accessible button labels, keyboard focus styles, responsive layout, and reduced-motion support.
+
+## Test the real HTTP workflow locally
+
+No external server or challenge URL is needed. From the project root, run the mock target in one terminal:
+
+```powershell
+python -m tests.mock_http_server --port 8080
+```
+
+In another terminal, start FastAPI:
+
+```powershell
+$env:TEST_TARGET_URL = 'http://127.0.0.1:8080/echo'
+$env:TEST_REQUEST_TIMEOUT = '10'
+python -m uvicorn main:app --host 127.0.0.1 --port 5000 --reload
+```
+
+In a third terminal, run the existing frontend:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Open http://127.0.0.1:5173 and click Random Attack. Alternatively, run `npm run build` and open http://127.0.0.1:5000. Keep VITE_DEMO_MODE unset or false for real HTTP execution. The existing public static demo is unchanged and remains simulated.
+
+TEST_TARGET_URL accepts a complete HTTP(S) endpoint, including path/query, on a host explicitly approved by HONEYPOT_ALLOWED_HOSTS. If unset, the button uses HONEYPOT_URL (default http://127.0.0.1:8080). TEST_REQUEST_TIMEOUT defaults to 10 seconds and must be greater than zero and at most 60. Environment changes require a backend restart; .env.example is a reference, not an automatically loaded configuration file.
+
+Use /large on the mock server to check an untruncated response, /status/503 for an actual HTTP error response, or /slow with TEST_REQUEST_TIMEOUT=0.05 for a read timeout. Automated integration tests start their own mock server on a free loopback port and verify actual transmitted form data, full response equality, WebSocket events, safe browser rendering, connection failure, and timeout behavior. Mock fixture data is explicitly identified and is never presented as a real honeypot detection.
+
+```powershell
+python -m unittest discover -s tests -v
+```

@@ -69,6 +69,7 @@ function useLivePanel() {
     try {
       const record = await api(path, body)
       setResult(record); setAttacks(old => [record, ...old.filter(a => a.attack_id !== record.attack_id)].slice(0, 1000))
+      await refresh().catch(() => setError('Response received, but terminal log backfill failed. Check the backend connection.'))
       return record
     } catch (e) { setError(e.message); throw e }
     finally { setBusy(false); launching.current = false }

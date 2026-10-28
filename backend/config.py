@@ -19,3 +19,28 @@ def validate_target():
     if parts.username or parts.password or parts.query or parts.fragment or parts.path not in ('', '/'):
         raise ValueError('HONEYPOT_URL must be an origin without credentials, path, query, or fragment')
     return HONEYPOT_BASE_URL
+
+
+def test_target_url():
+    """The harmless button may use a full endpoint; the payload library stays unchanged."""
+    url = os.getenv('TEST_TARGET_URL', HONEYPOT_BASE_URL).strip()
+    try:
+        parts = urlsplit(url)
+        port = parts.port
+    except ValueError as exc:
+        raise ValueError('TEST_TARGET_URL has an invalid host or port') from exc
+    if parts.scheme not in ('http', 'https') or parts.hostname not in ALLOWED_TARGET_HOSTS:
+        raise ValueError('TEST_TARGET_URL must use HTTP(S) and a host in HONEYPOT_ALLOWED_HOSTS')
+    if parts.username or parts.password or parts.fragment:
+        raise ValueError('TEST_TARGET_URL must not contain credentials or a fragment')
+    return url
+
+
+def request_timeout():
+    try:
+        value = float(os.getenv('TEST_REQUEST_TIMEOUT', '10'))
+    except ValueError as exc:
+        raise ValueError('TEST_REQUEST_TIMEOUT must be a number between 0 and 60 seconds') from exc
+    if not 0 < value <= 60:
+        raise ValueError('TEST_REQUEST_TIMEOUT must be greater than 0 and at most 60 seconds')
+    return value

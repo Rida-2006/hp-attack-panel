@@ -48,7 +48,7 @@ class PanelIntegrationTests(unittest.TestCase):
         self.assertFalse(record['honeypot_confirmed'])
         self.assertEqual(target.request.call_args.kwargs['headers']['X-Attack-ID'], record['attack_id'])
         self.assertEqual(self.client.get('/api/attacks').json()[0], record)
-        self.assertEqual({e['type'] for e in self.client.get('/api/events').json()}, {'attack', 'request', 'response'})
+        self.assertEqual({e['type'] for e in self.client.get('/api/events').json()}, {'attack', 'target', 'request', 'response', 'body', 'complete'})
         with TestClient(app, client=('127.0.0.1', 51001)) as second:
             self.assertEqual(second.get('/api/attacks').json()[0]['attack_id'], record['attack_id'])
 
@@ -98,8 +98,8 @@ class PanelIntegrationTests(unittest.TestCase):
         with self.client.websocket_connect('/ws', headers={'origin': 'http://localhost:5173'}) as socket:
             with mock:
                 result = self.client.post('/api/attacks/random', json={}).json()
-            events = [socket.receive_json() for _ in range(3)]
-        self.assertEqual([e['type'] for e in events], ['attack', 'request', 'response'])
+            events = [socket.receive_json() for _ in range(6)]
+        self.assertEqual([e['type'] for e in events], ['attack', 'target', 'request', 'response', 'body', 'complete'])
         self.assertTrue(all(e['attack_id'] == result['attack_id'] for e in events))
         self.assertEqual(events[-1]['result']['attack_id'], result['attack_id'])
 

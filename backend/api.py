@@ -1,15 +1,15 @@
-import random
 from time import monotonic
 import httpx
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 from backend import storage
-from backend.config import ALLOWED_ORIGINS, HONEYPOT_NAME, validate_target
-from backend.execution import execute, library, ws_manager
+from backend.config import ALLOWED_ORIGINS, HONEYPOT_NAME, validate_target, test_target_url
+from backend.execution import execute, execute_test_post, library, ws_manager
 
 router = APIRouter()
 health_cache = {'checked_at': None, 'last_success': None, 'status': 'unchecked', 'http_status': None}
 health_time = 0.0
+health_target = None
 
 
 class Launch(BaseModel):
@@ -27,28 +27,36 @@ async def payloads():
 
 @router.get('/api/honeypot/info')
 async def info():
-    return {'name': HONEYPOT_NAME, 'url': validate_target(), 'environment': 'Authorized lab', 'log_integration': False, 'retention_days': 7}
+    try:
+        url = test_target_url()
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    return {'name': HONEYPOT_NAME, 'url': url, 'environment': 'Authorized lab', 'log_integration': False, 'retention_days': 7}
 
 
 @router.get('/api/honeypot/status')
 async def status():
-    global health_cache, health_time
-    if monotonic() - health_time < 10 and health_cache['checked_at']:
-        return {**await info(), **health_cache}
+    global health_cache, health_time, health_target
+    target_info = await info()
+    if monotonic() - health_time < 10 and health_cache['checked_at'] and health_target == target_info['url']:
+        return {**target_info, **health_cache}
+    if health_target != target_info['url']:
+        health_cache['last_success'] = None
+    health_target = target_info['url']
     health_time = monotonic()
     checked_at = storage.now()
     try:
         async with httpx.AsyncClient(timeout=3, follow_redirects=False, trust_env=False) as client:
-            result = await client.get(validate_target())
+            result = await client.get(target_info['url'])
         health_cache = {**health_cache, 'status': 'connected', 'http_status': result.status_code, 'checked_at': checked_at, 'last_success': checked_at}
     except httpx.HTTPError:
         health_cache = {**health_cache, 'status': 'disconnected', 'http_status': None, 'checked_at': checked_at}
-    return {**await info(), **health_cache}
+    return {**target_info, **health_cache}
 
 
 @router.post('/api/attacks/random')
 async def random_attack():
-    return await execute(random.choice(library())['id'])
+    return await execute_test_post()
 
 
 @router.post('/api/attacks/execute')
@@ -61,6 +69,8 @@ async def replay(attack_id: str):
     record = next((a for a in storage.attacks() if a['attack_id'] == attack_id), None)
     if not record:
         raise HTTPException(404, 'History record not found')
+    if record['payload_id'] == 'harmless-post':
+        return await execute_test_post('replay', replay_of=attack_id)
     return await execute(record['payload_id'], 'replay', replay_of=attack_id)
 
 

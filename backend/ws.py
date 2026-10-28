@@ -14,7 +14,7 @@ class WebSocketManager:
 
     async def broadcast(self, details: dict[str, object]) -> None:
         stale_clients: list[WebSocket] = []
-        for client in self.connected_clients:
+        for client in tuple(self.connected_clients):
             try:
                 await client.send_json(details)
             except Exception:

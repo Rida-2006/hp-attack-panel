@@ -22,6 +22,7 @@ export default function App() {
   const [lines, setLines] = useState([])
   const [clearedAt, setClearedAt] = useState(0)
   const terminal = useRef(null)
+  const executionSection = useRef(null)
   const commandHistory = useRef([])
   const historyPosition = useRef(0)
   const working = busy || pending
@@ -31,6 +32,20 @@ export default function App() {
   ].sort((a, b) => a.time.localeCompare(b.time)).slice(-200)
 
   useEffect(() => { if (terminal.current) terminal.current.scrollTop = terminal.current.scrollHeight }, [events, lines])
+
+  useEffect(() => {
+    if (shell) {
+      executionSection.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      document.getElementById('command')?.focus({ preventScroll: true })
+    }
+  }, [shell])
+
+  async function runRandomTest() {
+    try { await launch() }
+    catch (e) {
+      setLines(old => [...old, { id: crypto.randomUUID(), time: new Date().toISOString(), kind: 'error', text: e.message, error: true }].slice(-200))
+    }
+  }
 
   async function execute(event) {
     event.preventDefault()
@@ -52,12 +67,12 @@ export default function App() {
 
   return <main className="attack-workspace">
     {DEMO && <div className="demo-notice">PUBLIC DEMO · Simulated requests and results. No honeypot traffic is sent.</div>}
-    <header className="panel-header"><span className="identity-mark">HG<span> / </span>CONTROLLED TESTING</span><span className={`connection ${target?.status === 'connected' ? 'connected' : ''}`}><i/>{target?.name || 'Honeypot'} · {target?.status || 'checking'}</span></header>
+    <header className="panel-header"><span className={`connection ${target?.status === 'connected' ? 'connected' : ''}`}><i/>{target?.name || 'Honeypot'} · {target?.status || 'checking'}</span></header>
     <section className="attack-hero" aria-labelledby="panel-title">
       <p className="eyebrow">AUTHORIZED ENVIRONMENTS ONLY</p>
       <h1 id="panel-title">Attack Panel</h1>
       <p className="hero-description">One controlled test. Every step visible.</p>
-      <button className={`random-hero ${working ? 'executing' : ''}`} disabled={working || !payloads.length} onClick={() => launch().catch(() => {})} aria-label="Random Attack">
+      <button className={`random-hero ${working ? 'executing' : ''}`} disabled={working || !payloads.length} onClick={runRandomTest} aria-label="Random Attack">
         <span className="hero-corner top-left"/><span className="hero-corner bottom-right"/>
         <span className="bolt-halo"/><Bolt/>
         <span className="hero-action-label">{working ? 'Executing test…' : 'Random Attack'}</span>
@@ -67,7 +82,7 @@ export default function App() {
       <button className="custom-shell-toggle" onClick={() => setShell(s => !s)} aria-expanded={shell} aria-controls="custom-shell"><span aria-hidden="true">❯_</span> {shell ? 'Close Custom Shell' : 'Custom Shell'} <span aria-hidden="true">{shell ? '−' : '+'}</span></button>
     </section>
     {error && <div className="error-notice" role="alert">{error}</div>}
-    <section className="execution-terminal" aria-labelledby="terminal-title">
+    <section ref={executionSection} className="execution-terminal" aria-labelledby="terminal-title">
       <div className="terminal-toolbar"><div><span className="terminal-dots"><i/><i/><i/></span><h2 id="terminal-title">Live execution shell</h2></div><div><span className={`stream-label ${stream === 'connected' ? 'live' : ''}`}><i/>{stream === 'connected' ? 'STREAM CONNECTED' : stream === 'demo' ? 'SIMULATION' : 'RECONNECTING'}</span><button className="clear-terminal" onClick={() => { setLines([]); setClearedAt(Date.now()) }}>Clear view</button></div></div>
       <div ref={terminal} className="terminal-output" role="log" aria-live="polite" aria-relevant="additions" tabIndex={0} aria-label="Execution output">
         <div className="terminal-intro"><span>honeyguard</span> / attack runner<br/><span className="muted">{DEMO ? 'Simulation mode. No real requests are sent.' : 'Ready. Launch a random test or enter an approved command.'}</span></div>
@@ -75,7 +90,7 @@ export default function App() {
         {visible.map(line => <div className={`terminal-line ${line.error ? 'line-error' : ''}`} key={line.id}><time dateTime={line.time}>{new Date(line.time).toLocaleTimeString([], { hour12: false })}</time><span className={`line-kind kind-${line.kind}`}>{line.kind}</span><pre>{line.text}</pre></div>)}
         {working && <div className="terminal-working"><span className="spinner"/> Executing approved operation…</div>}
       </div>
-      {shell && <form id="custom-shell" className="custom-shell" onSubmit={execute}><label htmlFor="command">Supported test commands <span>help · status · list attacks · test ssti · test sqli · test xss · clear</span></label><div><span className="terminal-prompt">❯</span><input id="command" aria-label="Custom Shell command" autoFocus value={command} onChange={e => setCommand(e.target.value)} placeholder="Type help to see supported commands" autoComplete="off" spellCheck="false" onKeyDown={e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); historyPosition.current = Math.max(0, Math.min(commandHistory.current.length, historyPosition.current + (e.key === 'ArrowUp' ? -1 : 1))); setCommand(commandHistory.current[historyPosition.current] || '') } }}/><button disabled={working || !command.trim()}>Execute ↗</button></div><small>Approved commands only. No operating-system shell or custom target URLs.</small></form>}
+      {shell && <form id="custom-shell" className="custom-shell" onSubmit={execute}><label htmlFor="command">Supported test commands <span>help · status · list attacks · test ssti · test sqli · test xss · clear</span></label><div><span className="terminal-prompt">❯</span><input id="command" aria-label="Custom Shell command" value={command} onChange={e => setCommand(e.target.value)} placeholder="Type help to see supported commands" autoComplete="off" spellCheck="false" onKeyDown={e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); historyPosition.current = Math.max(0, Math.min(commandHistory.current.length, historyPosition.current + (e.key === 'ArrowUp' ? -1 : 1))); setCommand(commandHistory.current[historyPosition.current] || '') } }}/><button disabled={working || !command.trim()}>Execute ↗</button></div><small>Approved commands only. No operating-system shell or custom target URLs.</small></form>}
       <div className="terminal-footer"><span>Fixed target · {DEMO ? 'simulated' : 'panel-observed'} output</span><span>{result ? `${result.attack_id} · ${result.status === 'completed' ? `HTTP ${result.http_status}` : result.status}` : 'X-Attack-ID correlation enabled'}</span></div>
     </section>
     <footer className="panel-footer"><span>HONEYGUARD <b> / </b> ATTACK PANEL</span><span>Monitoring and reports belong to Threat Intelligence.</span></footer>
