@@ -68,8 +68,3 @@ export function useDemoPanel() {
   async function launch(path = '/attacks/random', body = {}) { setError(''); try { const record = await demoApi(path, body); setResult(record); return record } catch (e) { setError(e.message); throw e } }
   return { attacks, events, payloads, target, stream: 'demo', error, busy: running, result, launch, dismissResult: () => setResult(null), check: async () => notify(), refresh: async () => notify() }
 }
-export function downloadDemoCSV() {
-  const fields = ['attack_id', 'timestamp', 'attack_type', 'path', 'http_status', 'duration_ms', 'simulated']
-  const csv = [fields, ...attacks.map(a => fields.map(f => a[f]))].map(row => row.map(v => `"${String(v ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n')
-  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); const a = document.createElement('a'); a.href = url; a.download = 'honeypot-simulated-history.csv'; a.click(); URL.revokeObjectURL(url)
-}

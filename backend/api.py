@@ -1,12 +1,7 @@
-import csv
-import io
 import random
-from collections import Counter
-from datetime import datetime, timezone
 from time import monotonic
 import httpx
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import Response
 from pydantic import BaseModel, Field
 from backend import storage
 from backend.config import ALLOWED_ORIGINS, HONEYPOT_NAME, validate_target
@@ -79,19 +74,6 @@ async def events():
     return storage.events()
 
 
-@router.get('/api/analytics')
-async def analytics():
-    records = storage.attacks()
-    completed = [a for a in records if a['status'] == 'completed']
-    today = datetime.now(timezone.utc).date()
-    hourly = [0] * 24
-    for a in records:
-        dt = datetime.fromisoformat(a['timestamp'])
-        if dt.date() == today:
-            hourly[dt.hour] += 1
-    return {'total': len(records), 'completed': len(completed), 'failed': sum(a['status'] == 'failed' for a in records), 'average_ms': round(sum(a['duration_ms'] for a in completed) / len(completed), 1) if completed else None, 'by_type': dict(Counter(a['attack_type'] for a in records)), 'hourly': hourly, 'suspicious_events': None, 'unique_source_ips': None, 'uptime': None}
-
-
 @router.post('/api/console/execute')
 async def console(body: Command):
     command = ' '.join(body.command.lower().split())
@@ -113,17 +95,6 @@ async def console(body: Command):
             result = await execute(payload['id'], 'console')
             return {'output': result, 'result': result}
     raise HTTPException(400, 'Unsupported command. Type help for the approved commands.')
-
-
-@router.get('/api/reports/attacks.csv')
-async def report():
-    out = io.StringIO(newline='')
-    fields = ['attack_id', 'timestamp', 'attack_type', 'payload_id', 'method', 'path', 'status', 'http_status', 'duration_ms', 'source', 'honeypot_confirmed', 'error']
-    writer = csv.DictWriter(out, fieldnames=fields, extrasaction='ignore')
-    writer.writeheader()
-    for record in storage.attacks():
-        writer.writerow({k: ("'" + v if isinstance(v, str) and v.startswith(('=', '+', '-', '@', '\t', '\r')) else v) for k, v in record.items()})
-    return Response(out.getvalue(), media_type='text/csv', headers={'Content-Disposition': 'attachment; filename="honeypot-attack-history.csv"'})
 
 
 @router.post('/fire-random')

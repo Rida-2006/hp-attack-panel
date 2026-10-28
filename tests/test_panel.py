@@ -37,7 +37,7 @@ class PanelIntegrationTests(unittest.TestCase):
             self.assertEqual(response.status_code, 400)
         self.assertEqual(self.client.get('/api/attacks').json(), [])
 
-    def test_execution_persistence_correlation_and_analytics(self):
+    def test_execution_persistence_and_correlation(self):
         mock, target = self.mock_target(403)
         with mock:
             response = self.client.post('/api/attacks/execute', json={'payload_id': 'p-005'})
@@ -49,9 +49,6 @@ class PanelIntegrationTests(unittest.TestCase):
         self.assertEqual(target.request.call_args.kwargs['headers']['X-Attack-ID'], record['attack_id'])
         self.assertEqual(self.client.get('/api/attacks').json()[0], record)
         self.assertEqual({e['type'] for e in self.client.get('/api/events').json()}, {'attack', 'request', 'response'})
-        analytics = self.client.get('/api/analytics').json()
-        self.assertEqual(analytics['completed'], 1)
-        self.assertIsNone(analytics['suspicious_events'])
         with TestClient(app, client=('127.0.0.1', 51001)) as second:
             self.assertEqual(second.get('/api/attacks').json()[0]['attack_id'], record['attack_id'])
 
@@ -106,14 +103,12 @@ class PanelIntegrationTests(unittest.TestCase):
         self.assertTrue(all(e['attack_id'] == result['attack_id'] for e in events))
         self.assertEqual(events[-1]['result']['attack_id'], result['attack_id'])
 
-    def test_report_csv_and_retention(self):
+    def test_monitoring_routes_removed_and_execution_retention(self):
         mock, _ = self.mock_target()
         with mock:
             result = self.client.post('/api/attacks/random', json={}).json()
-        response = self.client.get('/api/reports/attacks.csv')
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(result['attack_id'], response.text)
-        self.assertIn('attachment', response.headers['content-disposition'])
+        self.assertEqual(self.client.get('/api/reports/attacks.csv').status_code, 404)
+        self.assertEqual(self.client.get('/api/analytics').status_code, 404)
         old = {**result, 'attack_id': 'OLD', 'timestamp': '2020-01-01T00:00:00+00:00'}
         storage.save_attack(old)
         self.assertFalse(any(a['attack_id'] == 'OLD' for a in storage.attacks()))
