@@ -12,6 +12,18 @@ ALLOWED_TARGET_HOSTS = {h.strip().lower() for h in os.getenv('HONEYPOT_ALLOWED_H
 ALLOWED_ORIGINS = {o.strip() for o in os.getenv('PANEL_ORIGINS', 'http://localhost:5000,http://127.0.0.1:5000,http://localhost:5173,http://127.0.0.1:5173').split(',')}
 
 
+def tailscale_request(connection):
+    """Trust Serve identity only through the configured loopback proxy host.
+
+    Run Uvicorn with --no-proxy-headers and bind to loopback exclusively.
+    """
+    host = os.getenv('PANEL_TAILSCALE_HOST', '').strip().lower()
+    return bool(host and connection.client.host in ('127.0.0.1', '::1', 'testclient')
+                and connection.url.hostname == host
+                and connection.headers.get('tailscale-user-login')
+                and connection.headers.get('x-forwarded-proto') == 'https')
+
+
 def validate_target():
     parts = urlsplit(HONEYPOT_BASE_URL)
     if parts.scheme not in ('http', 'https') or parts.hostname not in ALLOWED_TARGET_HOSTS:

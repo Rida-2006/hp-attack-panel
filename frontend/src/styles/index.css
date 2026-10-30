@@ -13,3 +13,30 @@
 .terminal-toolbar{flex-wrap:wrap}
 .hero-meta code{overflow-wrap:anywhere;min-width:0;max-width:100%}
 @media(max-width:700px){.attack-hero{min-height:calc(100svh - 75px);padding-bottom:48px}}
+
+/* Launch view expands into a lab workspace with equal controls and output panes. */
+.attack-workspace{max-width:1600px}
+.execution-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,0fr);gap:0;transition:grid-template-columns .55s ease,gap .55s ease}
+.attack-hero{min-width:0;transition:padding .55s ease}
+.execution-terminal{width:100%;min-width:0;margin:24px 0 0;opacity:0;visibility:hidden;transform:translateX(48px);transition:opacity .45s ease,transform .55s ease,visibility .45s;pointer-events:none;height:0;border-width:0}
+.split-active .execution-layout{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px}
+.split-active .execution-terminal{display:flex;flex-direction:column;height:calc(100svh - 150px);min-height:480px;border-width:1px;opacity:1;visibility:visible;transform:translateX(0);pointer-events:auto;resize:vertical;overflow:auto}
+.split-active .terminal-output{flex:1;min-height:180px;height:auto}
+.split-active .attack-hero{min-height:0;padding-top:40px;padding-bottom:28px}
+.selected-test{max-width:540px;margin:24px auto 0;padding:18px;border:1px solid #d8a84b33;border-radius:8px;text-align:left;background:#1b182066;overflow-wrap:anywhere}
+.selected-test h2{font-size:17px;color:#f6d68a;margin:8px 0}
+.selected-test p{font-size:12px;color:#c7bac2;line-height:1.7}
+.selected-test code,.selected-test small{display:block;font-size:10px;color:#b6a38b;margin-top:8px}
+.selected-test .execution-state{text-transform:uppercase;color:#f6d68a;margin-top:8px}
+.error-notice{margin-top:20px}
+@media(max-width:900px){.split-active .execution-layout{grid-template-columns:minmax(0,1fr);gap:16px}.execution-layout{grid-template-columns:minmax(0,1fr)}.execution-terminal{display:none}.split-active .execution-terminal{display:flex;margin:0 auto;max-width:640px;height:65svh;min-height:420px}.split-active .attack-hero{padding-top:30px}.split-active .random-hero{height:240px}.split-active .hero-bolt{height:125px}}
+
+/* Reveal a second control inside the existing hero footprint. */
+.attack-controls{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,0fr);gap:0;width:min(100%,540px);margin:30px auto 18px;transition:grid-template-columns .45s ease,gap .45s ease}
+.attack-controls>.random-hero{width:100%;min-width:0;margin:0}
+.attack-controls .rotate-control{opacity:0;visibility:hidden;pointer-events:none;transform:translateX(-12px);transition:opacity .35s ease,transform .45s ease,visibility .35s ease}
+.attack-controls.controls-expanded{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.attack-controls.controls-expanded .rotate-control{opacity:1;visibility:visible;pointer-events:auto;transform:translateX(0)}
+.controls-collapse{position:absolute;top:-20px;right:0;padding:0;border:0;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .35s ease,visibility .35s ease}
+.controls-expanded .controls-collapse{opacity:1;visibility:visible;pointer-events:auto}
+@media(max-width:700px){.attack-controls{margin-top:26px}.attack-controls.controls-expanded{gap:8px}.attack-controls.controls-expanded .hero-bolt{width:90px;height:120px;flex-shrink:0}}

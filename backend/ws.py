@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import WebSocket
 
 
@@ -13,12 +14,8 @@ class WebSocketManager:
         self.connected_clients.discard(websocket)
 
     async def broadcast(self, details: dict[str, object]) -> None:
-        stale_clients: list[WebSocket] = []
-        for client in tuple(self.connected_clients):
-            try:
-                await client.send_json(details)
-            except Exception:
-                stale_clients.append(client)
-
-        for client in stale_clients:
-            self.connected_clients.discard(client)
+        clients = tuple(self.connected_clients)
+        results = await asyncio.gather(*(asyncio.wait_for(client.send_json(details), timeout=1) for client in clients), return_exceptions=True)
+        for client, result in zip(clients, results):
+            if isinstance(result, BaseException):
+                self.connected_clients.discard(client)

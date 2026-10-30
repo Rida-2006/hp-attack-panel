@@ -47,7 +47,7 @@ class RealLocalHTTPTests(unittest.TestCase):
 
     def test_actual_post_and_full_response_stream(self):
         with self.client.websocket_connect('/ws', headers={'origin': 'http://localhost:5173'}) as ws:
-            response = self.client.post('/api/attacks/random', json={})
+            response = self.client.post('/api/attacks/connectivity', json={})
             messages = [ws.receive_json() for _ in range(6)]
         self.assertEqual(response.status_code, 200)
         record = response.json()
@@ -72,7 +72,7 @@ class RealLocalHTTPTests(unittest.TestCase):
 
     def test_http_error_status_preserves_body(self):
         os.environ['TEST_TARGET_URL'] = self.base + '/status/503'
-        record = self.client.post('/api/attacks/random', json={}).json()
+        record = self.client.post('/api/attacks/connectivity', json={}).json()
         self.assertEqual(record['http_status'], 503)
         self.assertFalse(record['success'])
         self.assertEqual(record['status'], 'completed')
@@ -82,7 +82,7 @@ class RealLocalHTTPTests(unittest.TestCase):
     def test_real_timeout_is_recorded(self):
         os.environ['TEST_TARGET_URL'] = self.base + '/slow'
         os.environ['TEST_REQUEST_TIMEOUT'] = '.05'
-        record = self.client.post('/api/attacks/random', json={}).json()
+        record = self.client.post('/api/attacks/connectivity', json={}).json()
         self.assertEqual(record['status'], 'failed')
         self.assertIn('timed out', record['error'])
         self.assertIsNone(record['response_body'])
@@ -95,22 +95,23 @@ class RealLocalHTTPTests(unittest.TestCase):
             reserved.bind(('127.0.0.1', 0))
             unused_port = reserved.getsockname()[1]
         os.environ['TEST_TARGET_URL'] = f'http://127.0.0.1:{unused_port}/echo'
-        record = self.client.post('/api/attacks/random', json={}).json()
+        record = self.client.post('/api/attacks/connectivity', json={}).json()
         self.assertEqual(record['status'], 'failed')
-        self.assertRegex(record['error'], r'Connect(Error|Timeout)')
+        self.assertRegex(record['error'], r'Connect(Error|Timeout)|TimeoutError')
         self.assertFalse(record['success'])
         self.assertIsNone(record['http_status'])
 
     def test_invalid_target_and_timeout_are_clear_configuration_errors(self):
         for target in ('', 'https://example.com/test', 'http://127.0.0.1:bad/', 'http://user:secret@127.0.0.1/echo', 'http://127.0.0.1/echo#fragment'):
             os.environ['TEST_TARGET_URL'] = target
-            result = self.client.post('/api/attacks/random', json={})
+            result = self.client.post('/api/attacks/connectivity', json={})
             self.assertEqual(result.status_code, 400)
             self.assertIn('TEST_TARGET_URL', result.json()['detail'])
         os.environ['TEST_TARGET_URL'] = self.base + '/echo'
         for timeout in ('not-a-number', 'nan', '0', '61'):
             os.environ['TEST_REQUEST_TIMEOUT'] = timeout
-            self.assertEqual(self.client.post('/api/attacks/random', json={}).status_code, 400)
+            self.assertEqual(self.client.post('/api/attacks/connectivity', json={}).status_code, 400)
+            self.assertEqual(self.client.post('/api/console/execute', json={'command': 'test sqli'}).status_code, 400)
         self.assertEqual(self.server.received, [])
 
 

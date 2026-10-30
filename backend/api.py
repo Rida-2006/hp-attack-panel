@@ -2,9 +2,9 @@ from time import monotonic
 import httpx
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
-from backend import storage
-from backend.config import ALLOWED_ORIGINS, HONEYPOT_NAME, validate_target, test_target_url
-from backend.execution import execute, execute_test_post, library, ws_manager
+from backend import storage, catalogue
+from backend.config import ALLOWED_ORIGINS, HONEYPOT_NAME, validate_target, test_target_url, tailscale_request
+from backend.execution import execute, execute_test_post, execute_catalogue, library, ws_manager
 
 router = APIRouter()
 health_cache = {'checked_at': None, 'last_success': None, 'status': 'unchecked', 'http_status': None}
@@ -18,6 +18,17 @@ class Launch(BaseModel):
 
 class Command(BaseModel):
     command: str = Field(min_length=1, max_length=160)
+
+
+@router.get('/api/catalogue')
+async def cve_catalogue():
+    return catalogue.definitions(storage.attacks())
+
+
+@router.get('/api/execution/status')
+async def execution_status():
+    active = storage.active_execution()
+    return {'active': active, 'busy': active is not None}
 
 
 @router.get('/api/payloads')
@@ -54,9 +65,19 @@ async def status():
     return {**target_info, **health_cache}
 
 
+@router.post('/api/catalogue/{test_id}/execute')
+async def run_tripwire(test_id: str):
+    return await execute_catalogue(test_id, source='catalogue')
+
+
+@router.post('/api/attacks/connectivity')
+async def connectivity_check():
+    return await execute_test_post(source='connectivity-check')
+
+
 @router.post('/api/attacks/random')
 async def random_attack():
-    return await execute_test_post()
+    return await execute_catalogue()
 
 
 @router.post('/api/attacks/execute')
@@ -69,6 +90,8 @@ async def replay(attack_id: str):
     record = next((a for a in storage.attacks() if a['attack_id'] == attack_id), None)
     if not record:
         raise HTTPException(404, 'History record not found')
+    if record.get('catalogue'):
+        return await execute_catalogue(record['payload_id'], 'replay', attack_id)
     if record['payload_id'] == 'harmless-post':
         return await execute_test_post('replay', replay_of=attack_id)
     return await execute(record['payload_id'], 'replay', replay_of=attack_id)
@@ -88,9 +111,11 @@ async def events():
 async def console(body: Command):
     command = ' '.join(body.command.lower().split())
     if command == 'help':
-        return {'output': 'help | status | list attacks | test <category> | logs | history | clear\nApproved categories: ' + ', '.join(p['category'] for p in library()) + '\nThis is an allowlisted test console, not an operating-system shell.'}
+        return {'output': 'help | status | list attacks | list tests | test <category or tripwire ID> | logs | history | clear\nApproved categories: ' + ', '.join(p['category'] for p in library()) + '\nThis is an allowlisted test console, not an operating-system shell.'}
     if command == 'status':
         return {'output': await status()}
+    if command == 'list tests':
+        return {'output': catalogue.definitions(storage.attacks())}
     if command == 'list attacks':
         return {'output': [{'id': p['id'], 'category': p['category'], 'name': p['name']} for p in library()]}
     if command == 'logs':
@@ -99,6 +124,9 @@ async def console(body: Command):
         return {'output': storage.attacks()[:20]}
     if command == 'clear':
         return {'clear': True, 'output': 'Console cleared. Stored history is preserved.'}
+    if command.startswith('test ') and any(e['id'] == command[5:] and e['enabled'] for e in catalogue.TESTS):
+        result = await execute_catalogue(command[5:], source='console')
+        return {'output': result, 'result': result}
     if command.startswith('test '):
         payload = next((p for p in library() if p['category'] == command[5:] or p['id'] == command[5:]), None)
         if payload:
@@ -116,6 +144,9 @@ async def legacy_random():
 @router.websocket('/ws')
 async def websocket_endpoint(websocket: WebSocket):
     if websocket.client.host not in ('127.0.0.1', '::1', 'testclient') or websocket.headers.get('origin') not in ALLOWED_ORIGINS:
+        await websocket.close(code=1008)
+        return
+    if websocket.url.hostname not in ('localhost', '127.0.0.1', '::1', 'testserver') and not tailscale_request(websocket):
         await websocket.close(code=1008)
         return
     await ws_manager.connect(websocket)

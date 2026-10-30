@@ -8,6 +8,8 @@ from urllib.parse import parse_qs, urlsplit
 
 class MockTarget(BaseHTTPRequestHandler):
     def do_GET(self):
+        if self.path.startswith('/cgi-bin/'):
+            return self.do_POST()
         self.respond(200, {'message': 'Local mock HTTP server is running', 'method': 'GET'})
 
     def do_POST(self):
@@ -22,14 +24,15 @@ class MockTarget(BaseHTTPRequestHandler):
             'literal_text': '<script>window.mockResponseExecuted = true</script>',
             'unicode': 'Actual response: café / ✓',
         }
-        if path == '/large':
+        query = parse_qs(urlsplit(self.path).query)
+        if path == '/large' or query.get('qa_large') == ['1']:
             payload['large_body'] = 'FULL_RESPONSE_START\n' + 'Original server text. ' * 600 + '\nFULL_RESPONSE_END'
         body = json.dumps(payload, ensure_ascii=False, indent=2)
         if hasattr(self.server, 'received'):
             self.server.received.append({'method': self.command, 'path': self.path, 'form': form, 'raw': raw, 'headers': dict(self.headers), 'response_body': body})
-        if path == '/slow':
-            time.sleep(.5)
-        self.respond(503 if path == '/status/503' else 200, body)
+        delay = parse_qs(urlsplit(self.path).query).get('delay', ['.5' if path == '/slow' else '0'])[0]
+        time.sleep(min(3, max(0, float(delay))))
+        self.respond(int(query.get('qa_status', ['503' if path == '/status/503' else '200'])[0]), body)
 
     def respond(self, status, body):
         if not isinstance(body, str):
